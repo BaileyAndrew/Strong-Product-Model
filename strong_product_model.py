@@ -89,7 +89,12 @@ def strong_product_model(
     init_cols_within_rows: Optional[np.ndarray] = None,
     # Debugging tools
     verbose: bool = False,
-    verbose_every: int = 1
+    verbose_every: int = 1,
+    return_errors: bool = False,
+    # Fix parameters
+    fix_Psi_1: bool = False,
+    fix_Psi_2w: bool = False,
+    fix_Theta: bool = False,
 ) -> dict[str, np.ndarray]:
     """
     Finds the graphs for the strong product model
@@ -118,6 +123,10 @@ def strong_product_model(
         Whether to print out losses
     verbose_every: int
         How often to print out losses
+    return_errors: bool
+        Whether to return the errors
+    fix_{X}: bool
+        Whether to fix the graph for X at the initial graph
 
     Returns
     -------
@@ -136,6 +145,9 @@ def strong_product_model(
 
     d_1, d_2 = data_matrix.shape
 
+    if return_errors:
+        errors = []
+
     # The identity matrix makes a good default initialization
     if init_rows is None:
         init_rows = np.eye(d_1)
@@ -149,11 +161,13 @@ def strong_product_model(
     Psi_2w = init_cols_within_rows
     Theta = init_cols_between_rows + np.eye(d_2)
 
-
     # Useful precomputation
     S_2 = data_matrix.T @ data_matrix
 
     old_NLL = NLL(Psi_1, Psi_2w, Theta, S_2, data_matrix)
+    if return_errors:
+        errors.append(old_NLL)
+
     for i in range(max_iter):
         # Store starting point
         old_Psi_1 = Psi_1
@@ -185,9 +199,12 @@ def strong_product_model(
 
         # Get new points
         lr = lr_init
-        Psi_1 = old_Psi_1 @ linalg.expm(-lr * A)
-        Psi_2w = old_Psi_2w @ linalg.expm(-lr * B)
-        Theta = old_Theta @ linalg.expm(-lr * C)
+        if not fix_Psi_1:
+            Psi_1 = old_Psi_1 @ linalg.expm(-lr * A)
+        if not fix_Psi_2w:
+            Psi_2w = old_Psi_2w @ linalg.expm(-lr * B)
+        if not fix_Theta:
+            Theta = old_Theta @ linalg.expm(-lr * C)
 
         # Measure the size of the gradient, for Armijo
         grad_norm = (
@@ -212,9 +229,12 @@ def strong_product_model(
                 if Psi_1_posdef and Psi_2w_posdef and Theta_posdef:
                     break
             lr *= lr_decay
-            Psi_1 = old_Psi_1 @ linalg.expm(-lr * A)
-            Psi_2w = old_Psi_2w @ linalg.expm(-lr * B)
-            Theta = old_Theta @ linalg.expm(-lr * C)
+            if not fix_Psi_1:
+                Psi_1 = old_Psi_1 @ linalg.expm(-lr * A)
+            if not fix_Psi_2w:
+                Psi_2w = old_Psi_2w @ linalg.expm(-lr * B)
+            if not fix_Theta:
+                Theta = old_Theta @ linalg.expm(-lr * C)
             try:
                 new_NLL = NLL(Psi_1, Psi_2w, Theta, S_2, data_matrix)
             except:
@@ -231,6 +251,9 @@ def strong_product_model(
         if abs(new_NLL - old_NLL) < tol:
             converged = True
         
+        if return_errors:
+            errors.append(new_NLL)
+
         if converged:
             if verbose:
                 print(f"Iteration {i+1}: {new_NLL} (converged)")
@@ -241,10 +264,16 @@ def strong_product_model(
 
         old_NLL = new_NLL
 
-    return {
+    
+    to_return = {
         "rows": Psi_1,
         "cols_within_rows": Psi_2w,
         "cols_between_rows": Theta - np.eye(d_2),
     }
+
+    if return_errors:
+        to_return["errors"] = errors
+
+    return to_return
 
     
