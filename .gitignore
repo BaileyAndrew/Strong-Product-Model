@@ -1,2 +1,9 @@
 # Ignore everything in data folder
 data/*
+
+# Ignore files generative-synthetic.ipynb
+# synthetic copy.ipynb
+# synthetic-bigrho.iypnb
+generative-synthetic.ipynb
+synthetic copy.ipynb
+synthetic-bigrho.iypnb
