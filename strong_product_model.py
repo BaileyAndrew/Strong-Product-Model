@@ -164,7 +164,9 @@ def strong_product_model(
     # Useful precomputation
     S_2 = data_matrix.T @ data_matrix
 
-    old_NLL = NLL(Psi_1, Psi_2w, Theta, S_2, data_matrix)
+    old_NLL = NLL(Psi_1, Theta, Psi_2w, S_2, data_matrix)
+    if verbose:
+        print(f"Iteration 0: {old_NLL}")
     if return_errors:
         errors.append(old_NLL)
 
@@ -178,19 +180,19 @@ def strong_product_model(
         Lam, V = linalg.eigh(Psi_1)
 
         # Simultaneously diagonalize the other two
-        P, D = sim_diag(Psi_2w, Theta)
+        P, D = sim_diag(Theta, Psi_2w)
 
         # Get grad^S * X, an intermediate step
         # between gradient and retraction
-        A, B, C = gradients_shifted(
+        A, C, B = gradients_shifted(
             data_matrix,
             S_2,
             Psi_1,
             V,
             Lam,
-            Psi_2w,
+            Theta,#Psi_2w,
             P,
-            Theta,
+            Psi_2w,#Theta,
             D,
             rho_rows,
             rho_cols_within_rows,
@@ -215,7 +217,7 @@ def strong_product_model(
 
         # Line search
         try:
-            new_NLL = NLL(Psi_1, Psi_2w, Theta, S_2, data_matrix)
+            new_NLL = NLL(Psi_1, Theta, Psi_2w, S_2, data_matrix)
         except:
             new_NLL = np.inf
 
@@ -236,7 +238,7 @@ def strong_product_model(
             if not fix_Theta:
                 Theta = old_Theta @ linalg.expm(-lr * C)
             try:
-                new_NLL = NLL(Psi_1, Psi_2w, Theta, S_2, data_matrix)
+                new_NLL = NLL(Psi_1, Theta, Psi_2w, S_2, data_matrix)
             except:
                 new_NLL = np.inf
         else:
